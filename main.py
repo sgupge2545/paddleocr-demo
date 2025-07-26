@@ -2,12 +2,12 @@ from paddleocr import PaddleOCR
 
 ocr = PaddleOCR(
     lang="japan",
-    use_doc_orientation_classify=True,
-    use_doc_unwarping=True,
-    use_textline_orientation=True,
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False,
 )
 
-results = ocr.predict("test.jpg")
+results = ocr.predict("band_02_y144-176.png")
 
 for i, res in enumerate(results):
     res.print()  # 文字列とスコアをコンソール表示
