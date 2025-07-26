@@ -23,25 +23,31 @@ TARGET = normalize("自動車登録番号又は車両番号")
 
 
 def find_horizontal_bands(
-    img, min_len_ratio=0.5, angle_thresh=5, merge_gap=5, save_debug=False
+    img,
+    min_len_ratio=0.5,
+    angle_thresh=5,
+    merge_gap=5,
+    save_debug=False,
+    debug_dir="debug",
 ):
     h, w = img.shape[:2]
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     if save_debug:
-        cv2.imwrite("debug_1_gray.png", gray)
+        os.makedirs(debug_dir, exist_ok=True)
+        cv2.imwrite(f"{debug_dir}/debug_1_gray.png", gray)
 
     bw = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 35, 15
     )
 
     if save_debug:
-        cv2.imwrite("debug_2_binary.png", bw)
+        cv2.imwrite(f"{debug_dir}/debug_2_binary.png", bw)
 
     edges = cv2.Canny(bw, 50, 150, apertureSize=3)
 
     if save_debug:
-        cv2.imwrite("debug_3_edges.png", edges)
+        cv2.imwrite(f"{debug_dir}/debug_3_edges.png", edges)
 
     lines = cv2.HoughLinesP(
         edges,
@@ -62,7 +68,7 @@ def find_horizontal_bands(
                     cv2.line(line_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 else:
                     cv2.line(line_img, (x1, y1), (x2, y2), (0, 0, 255), 1)
-        cv2.imwrite("debug_4_lines.png", line_img)
+        cv2.imwrite(f"{debug_dir}/debug_4_lines.png", line_img)
 
     ys = []
     if lines is not None:
@@ -93,18 +99,21 @@ def find_horizontal_bands(
         for y1, y2 in strips:
             cv2.line(band_img, (0, y1), (w, y1), (255, 0, 0), 2)
             cv2.line(band_img, (0, y2), (w, y2), (255, 0, 0), 2)
-        cv2.imwrite("debug_5_bands.png", band_img)
+        cv2.imwrite(f"{debug_dir}/debug_5_bands.png", band_img)
 
     return strips  # [(y_top, y_bottom), ...]
 
 
-def extract_label_value(img_path, save_debug=False, save_json=False, save_bands=False):
+def extract_label_value(
+    img_path, save_debug=False, save_json=False, save_bands=False, debug_dir="debug"
+):
     img = cv2.imread(img_path)
-    bands = find_horizontal_bands(img, save_debug=save_debug)
+    bands = find_horizontal_bands(img, save_debug=save_debug, debug_dir=debug_dir)
 
     # bandsディレクトリを作成
+    bands_dir = f"{debug_dir}/bands"
     if save_bands:
-        os.makedirs("bands", exist_ok=True)
+        os.makedirs(bands_dir, exist_ok=True)
 
     label_band_idx = None
     texts_by_band = []
@@ -115,7 +124,7 @@ def extract_label_value(img_path, save_debug=False, save_json=False, save_bands=
 
         # バンド画像を保存
         if save_bands:
-            band_filename = f"bands/band_{i:02d}_y{y1}-{y2}.png"
+            band_filename = f"{bands_dir}/band_{i:02d}_y{y1}-{y2}.png"
             cv2.imwrite(band_filename, crop)
 
         res = ocr.predict(crop)[0]
@@ -159,7 +168,7 @@ def extract_label_value(img_path, save_debug=False, save_json=False, save_bands=
             "target_band_index": label_band_idx,
         }
 
-        with open("ocr_results.json", "w", encoding="utf-8") as f:
+        with open(f"{debug_dir}/ocr_results.json", "w", encoding="utf-8") as f:
             json.dump(json_data, f, ensure_ascii=False, indent=2)
 
     if label_band_idx is None:
@@ -167,10 +176,10 @@ def extract_label_value(img_path, save_debug=False, save_json=False, save_bands=
 
     # 右側テキスト抽出（同じバンド内でやる例）
     i, texts, _, (y1, y2) = texts_by_band[label_band_idx]
-    # ラベルの右側部分だけ結合したかったらOCRのボックスでやる方が簡単
-    # ここでは単純にバンド内テキスト全体を返す
     return "".join(texts)
 
 
-val = extract_label_value("test.jpg", save_debug=True, save_json=True, save_bands=True)
+val = extract_label_value(
+    "test.jpg", save_debug=True, save_json=True, save_bands=True, debug_dir="debug"
+)
 print(val)
