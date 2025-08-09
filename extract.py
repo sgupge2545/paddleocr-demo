@@ -5,6 +5,7 @@ import unicodedata
 import re
 import json
 import os
+from band_processor import find_horizontal_bands
 
 ocr = PaddleOCR(
     lang="japan",
@@ -20,88 +21,6 @@ def normalize(s):
 
 
 TARGET = normalize("自動車登録番号又は車両番号")
-
-
-def find_horizontal_bands(
-    img,
-    min_len_ratio=0.5,
-    angle_thresh=5,
-    merge_gap=5,
-    save_debug=False,
-    debug_dir="debug",
-):
-    h, w = img.shape[:2]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    if save_debug:
-        os.makedirs(debug_dir, exist_ok=True)
-        cv2.imwrite(f"{debug_dir}/debug_1_gray.png", gray)
-
-    bw = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 35, 15
-    )
-
-    if save_debug:
-        cv2.imwrite(f"{debug_dir}/debug_2_binary.png", bw)
-
-    edges = cv2.Canny(bw, 50, 150, apertureSize=3)
-
-    if save_debug:
-        cv2.imwrite(f"{debug_dir}/debug_3_edges.png", edges)
-
-    lines = cv2.HoughLinesP(
-        edges,
-        1,
-        np.pi / 180,
-        threshold=80,
-        minLineLength=int(w * min_len_ratio),
-        maxLineGap=10,
-    )
-
-    # 線検出結果を可視化
-    if save_debug:
-        line_img = img.copy()
-        if lines is not None:
-            for x1, y1, x2, y2 in lines[:, 0]:
-                angle = abs(np.degrees(np.arctan2(y2 - y1, x2 - x1)))
-                if angle < angle_thresh:
-                    cv2.line(line_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                else:
-                    cv2.line(line_img, (x1, y1), (x2, y2), (0, 0, 255), 1)
-        cv2.imwrite(f"{debug_dir}/debug_4_lines.png", line_img)
-
-    ys = []
-    if lines is not None:
-        for x1, y1, x2, y2 in lines[:, 0]:
-            angle = abs(np.degrees(np.arctan2(y2 - y1, x2 - x1)))
-            if angle < angle_thresh:
-                ys.append((min(y1, y2), max(y1, y2)))
-
-    ys.sort()
-    # マージ
-    bands = []
-    for y1, y2 in ys:
-        if not bands or y1 - bands[-1][1] > merge_gap:
-            bands.append([y1, y2])
-        else:
-            bands[-1][1] = max(bands[-1][1], y2)
-    # 画像の上下端もバンドとして追加して区切る
-    cuts = [0] + [int((a + b) / 2) for a, b in bands] + [h]
-    strips = [
-        (cuts[i], cuts[i + 1])
-        for i in range(len(cuts) - 1)
-        if cuts[i + 1] - cuts[i] > 10
-    ]
-
-    # 最終的なバンド区切りを可視化
-    if save_debug:
-        band_img = img.copy()
-        for y1, y2 in strips:
-            cv2.line(band_img, (0, y1), (w, y1), (255, 0, 0), 2)
-            cv2.line(band_img, (0, y2), (w, y2), (255, 0, 0), 2)
-        cv2.imwrite(f"{debug_dir}/debug_5_bands.png", band_img)
-
-    return strips  # [(y_top, y_bottom), ...]
 
 
 def extract_label_value(
@@ -127,7 +46,18 @@ def extract_label_value(
             band_filename = f"{bands_dir}/band_{i:02d}_y{y1}-{y2}.png"
             cv2.imwrite(band_filename, crop)
 
-        res = ocr.predict(crop)[0]
+        # OCR処理前にバンドを最大サイズ1500にリサイズ
+        h, w = crop.shape[:2]
+        max_size = 1500
+        if max(h, w) > max_size:
+            scale = max_size / max(h, w)
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            crop_resized = cv2.resize(crop, (new_w, new_h))
+        else:
+            crop_resized = crop
+
+        res = ocr.predict(crop_resized)[0]
         texts = res["rec_texts"]
         boxes = res["rec_polys"]
         confidences = res["rec_scores"]
@@ -180,6 +110,6 @@ def extract_label_value(
 
 
 val = extract_label_value(
-    "test.jpg", save_debug=True, save_json=True, save_bands=True, debug_dir="debug"
+    "IMG_0564.JPG", save_debug=True, save_json=True, save_bands=True, debug_dir="debug"
 )
 print(val)

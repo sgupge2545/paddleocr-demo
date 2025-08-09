@@ -1,4 +1,25 @@
 from paddleocr import PaddleOCR
+import cv2
+import numpy as np
+
+
+def resize_image(image_path, max_size=1200):
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError(f"画像を読み込めませんでした: {image_path}")
+
+    height, width = img.shape[:2]
+
+    if max(height, width) <= max_size:
+        return img
+
+    scale = max_size / max(height, width)
+    new_width = int(width * scale)
+    new_height = int(height * scale)
+
+    resized_img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+    return resized_img
+
 
 ocr = PaddleOCR(
     lang="japan",
@@ -7,7 +28,10 @@ ocr = PaddleOCR(
     use_textline_orientation=False,
 )
 
-results = ocr.predict("band_02_y144-176.png")
+# 画像をリサイズ
+resized_image = resize_image("IMG_0564.JPG", max_size=1200)
+
+results = ocr.predict(resized_image)
 
 for i, res in enumerate(results):
     res.print()  # 文字列とスコアをコンソール表示
