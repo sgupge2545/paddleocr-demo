@@ -80,9 +80,9 @@ def process_all_images():
     # PaddleOCRの初期化
     ocr = PaddleOCR(
         lang="japan",
-        use_doc_orientation_classify=False,
+        use_doc_orientation_classify=True,  # 文書の向き検出を有効化
         use_doc_unwarping=False,
-        use_textline_orientation=False,
+        use_textline_orientation=True,  # テキストラインの向き検出を有効化
     )
 
     # 検索キーワード
