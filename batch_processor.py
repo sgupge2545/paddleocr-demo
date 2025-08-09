@@ -3,7 +3,6 @@ import json
 import cv2
 import numpy as np
 from text_grouper_value import (
-    resize_image,
     resize_image_array,
     group_texts_by_y_position,
     find_keyword_and_value,
