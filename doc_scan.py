@@ -14,14 +14,9 @@ def order_points(pts):
     return rect
 
 
-def detect_document_edges(image: np.ndarray, max_height: int = 1000) -> np.ndarray:
-    # 速度確保のため長辺を揃えてダウンサンプリング
-    ratio = 1.0
-    if image.shape[0] > max_height:
-        ratio = image.shape[0] / max_height
-        image_small = cv2.resize(image, (int(image.shape[1] / ratio), max_height))
-    else:
-        image_small = image.copy()
+def detect_document_edges(image: np.ndarray) -> np.ndarray:
+    # 元の画像サイズで処理
+    image_small = image.copy()
     gray = cv2.cvtColor(image_small, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
     edged = cv2.Canny(gray, 50, 150)
@@ -35,11 +30,9 @@ def detect_document_edges(image: np.ndarray, max_height: int = 1000) -> np.ndarr
             doc_cnt = approx.reshape(4, 2)
             break
     if doc_cnt is None:
-        return None, ratio
-    # 小さい画像で検出した座標を元解像度に戻す
-    doc_cnt = doc_cnt * ratio
+        return None
     rect = order_points(doc_cnt)
-    return rect, ratio
+    return rect
 
 
 def perspective_transform(image: np.ndarray, points: np.ndarray) -> np.ndarray:
@@ -59,9 +52,9 @@ def perspective_transform(image: np.ndarray, points: np.ndarray) -> np.ndarray:
     return warped
 
 
-def scan_document(pil_image: Image.Image, max_height: int = 1000) -> Image.Image:
+def scan_document(pil_image: Image.Image) -> Image.Image:
     image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-    points, _ = detect_document_edges(image, max_height)
+    points = detect_document_edges(image)
     if points is None:
         print("書類らしき四角形が見つかりませんでした")
         return pil_image

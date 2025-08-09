@@ -20,7 +20,7 @@ def process_single_image(image_path, ocr, keywords):
 
         # まずドキュメントスキャンで前処理
         pil_image = Image.open(image_path)
-        scanned_image = scan_document(pil_image, max_height=1000)
+        scanned_image = scan_document(pil_image)
 
         # ドキュメントスキャン後の画像をリサイズ
         scanned_array = np.array(scanned_image)
