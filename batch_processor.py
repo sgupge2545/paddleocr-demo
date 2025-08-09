@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from text_grouper_value import (
     resize_image,
+    resize_image_array,
     group_texts_by_y_position,
     find_keyword_and_value,
 )
@@ -18,16 +19,17 @@ def process_single_image(image_path, ocr, keywords):
     try:
         print(f"\n=== 処理中: {image_path} ===")
 
-        # 画像をリサイズ
-        resized_image = resize_image(image_path, max_size=1250)
-
-        # ドキュメントスキャナーで前処理
-        pil_image = Image.fromarray(cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB))
+        # まずドキュメントスキャンで前処理
+        pil_image = Image.open(image_path)
         scanned_image = scan_document(pil_image, max_height=1000)
+
+        # ドキュメントスキャン後の画像をリサイズ
+        scanned_array = np.array(scanned_image)
+        resized_image = resize_image_array(scanned_array, max_size=1250)
 
         # 画像品質向上（必要に応じて）
         enhanced_image = enhance_document_quality(
-            scanned_image,
+            resized_image,
             blur=None,
             binarize=False,  # OCR前に2値化はしない
             clahe=True,  # コントラスト強調
@@ -107,12 +109,16 @@ def process_all_images():
         result = process_single_image(image_path, ocr, keywords)
         all_results.append(result)
 
+    # debugフォルダが存在しない場合は作成
+    debug_dir = "debug"
+    if not os.path.exists(debug_dir):
+        os.makedirs(debug_dir)
+
     # 結果をJSONファイルに保存
-    output_file = "batch_results.json"
+    output_file = os.path.join(debug_dir, "batch_results.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(all_results, f, ensure_ascii=False, indent=2)
 
-    print(f"\n=== 処理完了 ===")
     print(f"結果を {output_file} に保存しました")
     print(f"処理した画像数: {len(all_results)}")
 
